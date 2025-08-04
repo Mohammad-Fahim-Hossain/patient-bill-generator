@@ -355,7 +355,7 @@ def extract_service_date_icd_codes(rows):
     return {date: list(codes) for date, codes in service_date_diagnosis.items()}
 
 def generate_pdf(rows, provider, location, service_date_icds):
-    """Generate PDF bill for patient"""
+    """Generate PDF bill for patient - Optimized for speed"""
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=LETTER)
     width, height = LETTER
@@ -364,29 +364,44 @@ def generate_pdf(rows, provider, location, service_date_icds):
     MARGIN_RIGHT = 50
     y = height - 60
 
+    # Pre-calculate font metrics for speed
+    font_metrics = {
+        'title': ('Helvetica-Bold', 16),
+        'section': ('Helvetica-Bold', 12),
+        'normal': ('Helvetica', 11),
+        'small': ('Helvetica', 9),
+        'table_header': ('Helvetica-Bold', 11)
+    }
+
+    def set_font(font_type):
+        font_name, font_size = font_metrics[font_type]
+        c.setFont(font_name, font_size)
+
     def draw_title():
         nonlocal y
-        c.setFont("Helvetica-Bold", 16)
+        set_font('title')
         c.drawCentredString(width / 2, y, "PATIENT BILLING STATEMENT")
         y -= 40
 
     def draw_patient_info():
         nonlocal y
-        patient = rows[0]
+        patient = rows[0]  # Use first row for patient info
         name = patient.get('patient_name', 'N/A')
         pid = patient.get('patient_id', 'N/A')
+        
+        # Pre-build address string
         address_parts = [
             patient.get('patient_address1', '').strip(),
             patient.get('patient_city', '').strip(),
             patient.get('patient_state', '').strip(),
             patient.get('patient_zip', '').strip()
         ]
-        address = ", ".join([part for part in address_parts if part])
+        address = ", ".join(filter(None, address_parts))
         
-        c.setFont("Helvetica-Bold", 12)
+        set_font('section')
         c.drawString(MARGIN_LEFT, y, "PATIENT INFORMATION")
         y -= 20
-        c.setFont("Helvetica", 11)
+        set_font('normal')
         c.drawString(MARGIN_LEFT, y, f"Name: {name}    Patient ID: #{pid}")
         y -= 18
         c.drawString(MARGIN_LEFT, y, f"Address: {address}")
@@ -394,10 +409,10 @@ def generate_pdf(rows, provider, location, service_date_icds):
 
     def draw_provider_info():
         nonlocal y
-        c.setFont("Helvetica-Bold", 12)
+        set_font('section')
         c.drawString(MARGIN_LEFT, y, "PROVIDER INFORMATION")
         y -= 20
-        c.setFont("Helvetica", 11)
+        set_font('normal')
         c.drawString(MARGIN_LEFT, y, f"Provider: {provider}")
         y -= 18
         c.drawString(MARGIN_LEFT, y, f"Location: {location}")
@@ -405,141 +420,147 @@ def generate_pdf(rows, provider, location, service_date_icds):
 
     def draw_services_table():
         nonlocal y
-        c.setFont("Helvetica-Bold", 12)
+        set_font('section')
         c.drawString(MARGIN_LEFT, y, "SERVICES & CHARGES")
         y -= 25
-        total = 0.0
 
         headers = ["Sr.", "Date", "Code", "Description", "Modifier", "Units", "Charge"]
-        col_positions = [
-            MARGIN_LEFT,             # Sr.
-            MARGIN_LEFT + 25,        # Date
-            MARGIN_LEFT + 85,        # Code
-            MARGIN_LEFT + 130,       # Description (wider space)
-            MARGIN_LEFT + 400,       # Modifier
-            MARGIN_LEFT + 450,       # Units
-            MARGIN_LEFT + 490        # Charge
-        ]
+        col_positions = [MARGIN_LEFT, MARGIN_LEFT + 25, MARGIN_LEFT + 85, 
+                        MARGIN_LEFT + 130, MARGIN_LEFT + 400, MARGIN_LEFT + 450, MARGIN_LEFT + 490]
 
-        c.setFont("Helvetica-Bold", 11)
+        set_font('table_header')
         for i, header in enumerate(headers):
             c.drawString(col_positions[i], y, header)
+        
         y -= 15
         c.setLineWidth(0.5)
         c.line(MARGIN_LEFT, y, width - MARGIN_RIGHT, y)
         y -= 10
 
-        c.setFont("Helvetica", 9)  # Smaller font for more text
+        # Pre-calculate total and prepare all row data
+        total = 0.0
+        processed_rows = []
+        
+        set_font('small')
         for i, row in enumerate(rows, 1):
-            desc = row.get('code_desc', '').strip().upper()
-            # Handle potential None or non-numeric values in Charges
+            desc = str(row.get('code_desc', '') or '').strip().upper()
+            
+            # Fast numeric conversion
             try:
-                cost = float(row.get('Charges', '0') or 0)
+                cost = float(row.get('Charges') or 0)
             except (ValueError, TypeError):
                 cost = 0.0
             
             total += cost
             
-            # Calculate available space for description (from col 3 to col 4)
-            desc_width = col_positions[4] - col_positions[3] - 5  # 5 points padding
+            # Pre-process description for wrapping - simplified approach
+            desc_width_chars = 45  # Approximate characters that fit
             
-            # Check if we need multiple lines for description
-            if desc and len(desc) > 0:
-                # Calculate approximate characters that fit in the available width
-                char_width = 5  # Approximate character width in points for size 9 font
-                chars_per_line = int(desc_width / char_width)
-                
-                # Split description into lines if needed
-                desc_lines = []
-                if len(desc) <= chars_per_line:
-                    desc_lines = [desc]
-                else:
-                    # Split long descriptions into multiple lines
-                    words = desc.split(' ')
-                    current_line = ""
-                    for word in words:
-                        test_line = current_line + " " + word if current_line else word
-                        if len(test_line) <= chars_per_line:
-                            current_line = test_line
-                        else:
-                            if current_line:
-                                desc_lines.append(current_line)
-                                current_line = word
-                            else:
-                                # Word is too long, split it
-                                desc_lines.append(word[:chars_per_line])
-                                current_line = word[chars_per_line:]
-                    if current_line:
-                        desc_lines.append(current_line)
+            if len(desc) <= desc_width_chars:
+                desc_lines = [desc] if desc else [""]
             else:
-                desc_lines = [""]
+                # Simple word wrapping - faster than complex calculations
+                words = desc.split()
+                desc_lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = f"{current_line} {word}" if current_line else word
+                    if len(test_line) <= desc_width_chars:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            desc_lines.append(current_line)
+                        current_line = word
+                
+                if current_line:
+                    desc_lines.append(current_line)
             
-            # Draw the first line with all other values
-            values = [
-                str(i),
-                str(row.get('date_of_service', '') or ''),
-                str(row.get('code', '') or ''),
-                desc_lines[0] if desc_lines else "",
-                str(row.get('code_modifier_1', '') or ''),
-                str(row.get('ChargeUnits', '1') or '1'),
-                f"${cost:,.2f}"
-            ]
+            processed_rows.append({
+                'sr': str(i),
+                'date': str(row.get('date_of_service') or ''),
+                'code': str(row.get('code') or ''),
+                'desc_lines': desc_lines,
+                'modifier': str(row.get('code_modifier_1') or ''),
+                'units': str(row.get('ChargeUnits') or '1'),
+                'charge': f"${cost:,.2f}",
+                'cost': cost
+            })
+
+        # Draw all rows at once
+        for row_data in processed_rows:
+            # Draw first line with all columns
+            values = [row_data['sr'], row_data['date'], row_data['code'], 
+                     row_data['desc_lines'][0], row_data['modifier'], 
+                     row_data['units'], row_data['charge']]
             
             for j, val in enumerate(values):
                 c.drawString(col_positions[j], y, val)
             
-            # Draw additional description lines if needed
-            if len(desc_lines) > 1:
-                for desc_line in desc_lines[1:]:
-                    y -= 12  # Smaller line spacing for continuation
-                    c.drawString(col_positions[3], y, desc_line)
+            # Draw additional description lines if any
+            for desc_line in row_data['desc_lines'][1:]:
+                y -= 12
+                c.drawString(col_positions[3], y, desc_line)
             
-            y -= 20  # Standard row spacing
+            y -= 20
 
+        # Draw total
         y -= 5
-        c.setFont("Helvetica-Bold", 11)
+        set_font('table_header')
         c.drawString(col_positions[-2], y, "TOTAL:")
         c.drawString(col_positions[-1], y, f"${total:,.2f}")
         y -= 30
 
     def draw_icd_section():
         nonlocal y
-        c.setFont("Helvetica-Bold", 12)
+        set_font('section')
         c.drawString(MARGIN_LEFT, y, "DIAGNOSIS CODES (ICD):")
         y -= 20
-        c.setFont("Helvetica", 10)
+        
+        # Pre-process all ICD codes
         all_icds = []
         for icds in service_date_icds.values():
             all_icds.extend(icds)
-        icd_text = ', '.join(dict.fromkeys(all_icds)) or "N/A"
-        # Handle long ICD text by wrapping lines
-        words = icd_text.split(', ')
-        current_line = ""
-        line_width = 70  # Maximum characters per line
         
-        for word in words:
-            test_line = current_line + word + ", " if current_line else word + ", "
-            if len(test_line) > line_width and current_line:
-                # Draw current line and start new one
-                c.drawString(MARGIN_LEFT, y, current_line.rstrip(', '))
-                y -= 15
-                current_line = word + ", "
-            else:
-                current_line = test_line
-                
-        # Draw the last line
-        if current_line:
-            c.drawString(MARGIN_LEFT, y, current_line.rstrip(', '))
+        # Remove duplicates while preserving order
+        unique_icds = list(dict.fromkeys(all_icds))
+        icd_text = ', '.join(unique_icds) if unique_icds else "N/A"
+        
+        set_font('small')
+        
+        # Simple line wrapping for ICD codes
+        max_chars = 80
+        if len(icd_text) <= max_chars:
+            c.drawString(MARGIN_LEFT, y, icd_text)
             y -= 15
+        else:
+            words = icd_text.split(', ')
+            current_line = ""
+            
+            for word in words:
+                test_line = f"{current_line}, {word}" if current_line else word
+                if len(test_line) <= max_chars:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        c.drawString(MARGIN_LEFT, y, current_line)
+                        y -= 15
+                    current_line = word
+            
+            if current_line:
+                c.drawString(MARGIN_LEFT, y, current_line)
+                y -= 15
+        
         y -= 10
 
     def draw_footer():
-        now = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+        # Pre-format timestamp
+        timestamp = datetime.now().strftime("%B %d, %Y at %I:%M %p")
         c.setFont("Helvetica-Oblique", 9)
-        c.drawString(MARGIN_LEFT, 30, f"Generated on {now}")
+        c.drawString(MARGIN_LEFT, 30, f"Generated on {timestamp}")
         c.drawRightString(width - MARGIN_RIGHT, 30, "Page 1")
 
-    # Draw all sections
+    # Execute all drawing operations
     draw_title()
     draw_patient_info()
     draw_provider_info()
@@ -547,6 +568,7 @@ def generate_pdf(rows, provider, location, service_date_icds):
     draw_icd_section()
     draw_footer()
 
+    # Single save operation
     c.save()
     buffer.seek(0)
     return buffer
