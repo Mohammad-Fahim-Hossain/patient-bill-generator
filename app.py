@@ -1,7 +1,6 @@
 import os
 import sys
 import io
-import zipfile
 from collections import defaultdict
 from datetime import datetime
 from flask import Flask, request, send_file, render_template_string, jsonify
@@ -214,7 +213,7 @@ HTML_TEMPLATE = """
     <form id="billForm">
       <label for="patient_id">Patient ID:</label>
       <input type="text" id="patient_id" name="patient_id" required placeholder="Enter Patient ID">
-      <button type="submit" id="submitBtn">Generate & Download Bills</button>
+      <button type="submit" id="submitBtn">Generate & Download Bill</button>
     </form>
 
     <div class="status" id="statusDiv"></div>
@@ -265,7 +264,7 @@ HTML_TEMPLATE = """
         showStatus("Please enter a Patient ID", "error");
         spinner.style.display = 'none';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Generate & Download Bills';
+        submitBtn.textContent = 'Generate & Download Bill';
         return;
       }
 
@@ -281,20 +280,20 @@ HTML_TEMPLATE = """
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${patientId}_bills.zip`;
+        link.download = `${patientId}_bill.pdf`;
         document.body.appendChild(link);
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
         
-        showStatus("Bills generated and downloaded successfully!", "success");
+        showStatus("Bill generated and downloaded successfully!", "success");
       } catch (error) {
         console.error('Download error:', error);
         showStatus("Error: " + error.message, "error");
       } finally {
         spinner.style.display = 'none';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Generate & Download Bills';
+        submitBtn.textContent = 'Generate & Download Bill';
       }
     });
   </script>
@@ -328,7 +327,11 @@ def get_raw_diagnosis_data(diagnosis_string):
     return diagnosis_string.strip() if diagnosis_string else ""
 
 def extract_patient_data(rows):
-    """Extract patient and provider information"""
+    """Extract patient information (common for all services)"""
+    return "9741 Preston Road Frisco, TX 75033-2793, (972) 335-2004"
+
+def extract_provider_data_for_rows(rows):
+    """Extract provider information for specific rows"""
     rendering_providers = set()
     for row in rows:
         first_name = row.get('rendering_first_name', '').strip()
@@ -339,11 +342,10 @@ def extract_patient_data(rows):
             rendering_providers.add(f"Dr. {first_name}")
         elif last_name:
             rendering_providers.add(f"Dr. {last_name}")
-    provider = ', '.join(sorted(rendering_providers)) if rendering_providers else 'N/A'
-    return provider, "9741 Preston Road Frisco, TX 75033-2793, (972) 335-2004"
+    return ', '.join(sorted(rendering_providers)) if rendering_providers else 'N/A'
 
 def extract_service_date_icd_codes(rows):
-    """Extract ICD codes by service date"""
+    """Extract ICD codes by service date - FIXED to properly match service dates"""
     service_date_diagnosis = defaultdict(set)
     for row in rows:
         service_date = row.get('date_of_service', '').strip()
@@ -351,40 +353,43 @@ def extract_service_date_icd_codes(rows):
         if service_date and diagnosis_dxs:
             raw_diagnosis = get_raw_diagnosis_data(diagnosis_dxs)
             if raw_diagnosis:
-                service_date_diagnosis[service_date].add(raw_diagnosis)
-    return {date: list(codes) for date, codes in service_date_diagnosis.items()}
+                # Split multiple ICD codes if they are comma-separated or space-separated
+                icd_codes = [code.strip() for code in raw_diagnosis.replace(',', ' ').split() if code.strip()]
+                for code in icd_codes:
+                    service_date_diagnosis[service_date].add(code)
+    
+    # Convert sets to sorted lists for consistent output
+    return {date: sorted(list(codes)) for date, codes in service_date_diagnosis.items()}
 
-def generate_pdf(rows, provider, location, service_date_icds):
-    """Generate PDF bill for patient - Optimized for speed"""
+def generate_merged_pdf(rows, location, service_date_icds):
+    """Generate single merged PDF bill for patient with grand total on first page and one service date per page"""
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=LETTER)
     width, height = LETTER
 
     MARGIN_LEFT = 50
     MARGIN_RIGHT = 50
-    y = height - 60
-
+    BOTTOM_MARGIN = 80  # Increased bottom margin to prevent overflow
+    
     # Pre-calculate font metrics for speed
     font_metrics = {
         'title': ('Helvetica-Bold', 16),
         'section': ('Helvetica-Bold', 12),
         'normal': ('Helvetica', 11),
         'small': ('Helvetica', 9),
-        'table_header': ('Helvetica-Bold', 11)
+        'table_header': ('Helvetica-Bold', 10)  # Slightly smaller table headers
     }
 
     def set_font(font_type):
         font_name, font_size = font_metrics[font_type]
         c.setFont(font_name, font_size)
 
-    def draw_title():
-        nonlocal y
+    def draw_title(y_pos):
         set_font('title')
-        c.drawCentredString(width / 2, y, "PATIENT BILLING STATEMENT")
-        y -= 40
+        c.drawCentredString(width / 2, y_pos, "PATIENT BILLING STATEMENT")
+        return y_pos - 40
 
-    def draw_patient_info():
-        nonlocal y
+    def draw_patient_info(y_pos):
         patient = rows[0]  # Use first row for patient info
         name = patient.get('patient_name', 'N/A')
         pid = patient.get('patient_id', 'N/A')
@@ -399,50 +404,78 @@ def generate_pdf(rows, provider, location, service_date_icds):
         address = ", ".join(filter(None, address_parts))
         
         set_font('section')
-        c.drawString(MARGIN_LEFT, y, "PATIENT INFORMATION")
-        y -= 20
+        c.drawString(MARGIN_LEFT, y_pos, "PATIENT INFORMATION")
+        y_pos -= 20
         set_font('normal')
-        c.drawString(MARGIN_LEFT, y, f"Name: {name}    Patient ID: #{pid}")
-        y -= 18
-        c.drawString(MARGIN_LEFT, y, f"Address: {address}")
-        y -= 30
+        c.drawString(MARGIN_LEFT, y_pos, f"Name: {name}    Patient ID: #{pid}")
+        y_pos -= 18
+        c.drawString(MARGIN_LEFT, y_pos, f"Address: {address}")
+        return y_pos - 30
 
-    def draw_provider_info():
-        nonlocal y
+    def draw_grand_total_summary(y_pos, grand_total, service_dates_count):
+        """Draw grand total summary on first page"""
         set_font('section')
-        c.drawString(MARGIN_LEFT, y, "PROVIDER INFORMATION")
-        y -= 20
+        c.drawString(MARGIN_LEFT, y_pos, "BILLING SUMMARY")
+        y_pos -= 25
+        
+        # Draw summary box
+        c.setLineWidth(1)
+        box_height = 80
+        box_width = 400
+        c.rect(MARGIN_LEFT, y_pos - box_height, box_width, box_height)
+        
+        # Summary content
         set_font('normal')
-        c.drawString(MARGIN_LEFT, y, f"Provider: {provider}")
-        y -= 18
-        c.drawString(MARGIN_LEFT, y, f"Location: {location}")
-        y -= 30
+        y_pos -= 20
+        c.drawString(MARGIN_LEFT + 15, y_pos, f"Total Service Dates: {service_dates_count}")
+        y_pos -= 20
+        c.drawString(MARGIN_LEFT + 15, y_pos, f"Total Amount Due:")
+        
+        # Grand total amount - larger and prominent
+        set_font('title')
+        c.drawString(MARGIN_LEFT + 200, y_pos, f"${grand_total:,.2f}")
+        
+        y_pos -= 25
+        set_font('small')
+        c.drawString(MARGIN_LEFT + 15, y_pos, "Detailed billing information for each service date follows on subsequent pages.")
+        
+        return y_pos - 40
 
-    def draw_services_table():
-        nonlocal y
+    def draw_provider_info(y_pos, provider):
         set_font('section')
-        c.drawString(MARGIN_LEFT, y, "SERVICES & CHARGES")
-        y -= 25
+        c.drawString(MARGIN_LEFT, y_pos, "PROVIDER INFORMATION")
+        y_pos -= 20
+        set_font('normal')
+        c.drawString(MARGIN_LEFT, y_pos, f"Provider: {provider}")
+        y_pos -= 18
+        c.drawString(MARGIN_LEFT, y_pos, f"Location: {location}")
+        return y_pos - 30
+
+    def draw_services_table(y_pos, service_rows, service_date, page_num):
+        set_font('section')
+        c.drawString(MARGIN_LEFT, y_pos, f"SERVICES & CHARGES - {service_date}")
+        y_pos -= 25
 
         headers = ["Sr.", "Date", "Code", "Description", "Modifier", "Units", "Charge"]
-        col_positions = [MARGIN_LEFT, MARGIN_LEFT + 25, MARGIN_LEFT + 85, 
-                        MARGIN_LEFT + 130, MARGIN_LEFT + 400, MARGIN_LEFT + 450, MARGIN_LEFT + 490]
+        # Column positions - keeping charge column position consistent
+        col_positions = [MARGIN_LEFT, MARGIN_LEFT + 30, MARGIN_LEFT + 85, 
+                        MARGIN_LEFT + 130, MARGIN_LEFT + 380, MARGIN_LEFT + 440, MARGIN_LEFT + 485]
 
         set_font('table_header')
         for i, header in enumerate(headers):
-            c.drawString(col_positions[i], y, header)
+            c.drawString(col_positions[i], y_pos, header)
         
-        y -= 15
+        y_pos -= 15
         c.setLineWidth(0.5)
-        c.line(MARGIN_LEFT, y, width - MARGIN_RIGHT, y)
-        y -= 10
+        c.line(MARGIN_LEFT, y_pos, width - MARGIN_RIGHT, y_pos)
+        y_pos -= 10
 
         # Pre-calculate total and prepare all row data
         total = 0.0
         processed_rows = []
         
         set_font('small')
-        for i, row in enumerate(rows, 1):
+        for i, row in enumerate(service_rows, 1):
             desc = str(row.get('code_desc', '') or '').strip().upper()
             
             # Fast numeric conversion
@@ -453,8 +486,8 @@ def generate_pdf(rows, provider, location, service_date_icds):
             
             total += cost
             
-            # Pre-process description for wrapping - simplified approach
-            desc_width_chars = 45  # Approximate characters that fit
+            # Improved description wrapping - optimized for available space
+            desc_width_chars = 35  # Reduced to prevent overflow
             
             if len(desc) <= desc_width_chars:
                 desc_lines = [desc] if desc else [""]
@@ -487,52 +520,83 @@ def generate_pdf(rows, provider, location, service_date_icds):
                 'cost': cost
             })
 
-        # Draw all rows at once
+        # Draw all rows
         for row_data in processed_rows:
+            # Better overflow prevention - check for more space including ICD section
+            estimated_height = len(row_data['desc_lines']) * 12 + 80  # More space for subtotal and ICD
+            if y_pos - estimated_height < BOTTOM_MARGIN + 60:  # Increased margin check
+                # Draw page footer
+                draw_footer(page_num)
+                c.showPage()
+                page_num += 1
+                y_pos = height - 60
+                
+                # Redraw table headers on new page
+                set_font('section')
+                c.drawString(MARGIN_LEFT, y_pos, f"SERVICES & CHARGES - {service_date} (continued)")
+                y_pos -= 25
+                
+                set_font('table_header')
+                for i, header in enumerate(headers):
+                    c.drawString(col_positions[i], y_pos, header)
+                
+                y_pos -= 15
+                c.line(MARGIN_LEFT, y_pos, width - MARGIN_RIGHT, y_pos)
+                y_pos -= 10
+                set_font('small')
+            
             # Draw first line with all columns
             values = [row_data['sr'], row_data['date'], row_data['code'], 
                      row_data['desc_lines'][0], row_data['modifier'], 
                      row_data['units'], row_data['charge']]
             
             for j, val in enumerate(values):
-                c.drawString(col_positions[j], y, val)
+                c.drawString(col_positions[j], y_pos, val)
             
             # Draw additional description lines if any
             for desc_line in row_data['desc_lines'][1:]:
-                y -= 12
-                c.drawString(col_positions[3], y, desc_line)
+                y_pos -= 12
+                c.drawString(col_positions[3], y_pos, desc_line)
             
-            y -= 20
+            y_pos -= 18  # Reduced spacing between rows
 
-        # Draw total
-        y -= 5
+        # FIXED: Draw subtotal aligned with charge column
+        y_pos -= 10
+        c.setLineWidth(0.5)
+        c.line(MARGIN_LEFT, y_pos, width - MARGIN_RIGHT, y_pos)
+        y_pos -= 15
+        
         set_font('table_header')
-        c.drawString(col_positions[-2], y, "TOTAL:")
-        c.drawString(col_positions[-1], y, f"${total:,.2f}")
-        y -= 30
+        # FIXED: Align subtotal with the charge column (col_positions[6])
+        charge_col_pos = col_positions[6]  # This is the charge column position
+        
+        # Draw subtotal label and value aligned with charge column
+        c.drawRightString(charge_col_pos - 10, y_pos, "SUBTOTAL:")
+        c.drawString(charge_col_pos, y_pos, f"${total:,.2f}")
+        
+        return y_pos - 25, page_num, total
 
-    def draw_icd_section():
-        nonlocal y
+    def draw_icd_section(y_pos, service_date, icds):
+        # Better space checking for ICD section
+        min_space_needed = 60  # Minimum space needed for ICD section
+        
+        if y_pos < BOTTOM_MARGIN + min_space_needed:
+            return y_pos  # Skip if not enough space
+            
         set_font('section')
-        c.drawString(MARGIN_LEFT, y, "DIAGNOSIS CODES (ICD):")
-        y -= 20
+        c.drawString(MARGIN_LEFT, y_pos, f"DIAGNOSIS CODES (ICD) - {service_date}:")
+        y_pos -= 20
         
-        # Pre-process all ICD codes
-        all_icds = []
-        for icds in service_date_icds.values():
-            all_icds.extend(icds)
-        
-        # Remove duplicates while preserving order
-        unique_icds = list(dict.fromkeys(all_icds))
-        icd_text = ', '.join(unique_icds) if unique_icds else "N/A"
+        # FIXED: Use the correct ICD codes for this specific service date
+        icd_text = ', '.join(icds) if icds else "N/A"
         
         set_font('small')
         
-        # Simple line wrapping for ICD codes
-        max_chars = 80
+        # Improved line wrapping for ICD codes
+        max_chars = 75  # Adjusted for better fit
         if len(icd_text) <= max_chars:
-            c.drawString(MARGIN_LEFT, y, icd_text)
-            y -= 15
+            c.drawString(MARGIN_LEFT, y_pos, icd_text)
+            y_pos -= 15
         else:
             words = icd_text.split(', ')
             current_line = ""
@@ -543,30 +607,88 @@ def generate_pdf(rows, provider, location, service_date_icds):
                     current_line = test_line
                 else:
                     if current_line:
-                        c.drawString(MARGIN_LEFT, y, current_line)
-                        y -= 15
+                        c.drawString(MARGIN_LEFT, y_pos, current_line)
+                        y_pos -= 15
+                        # Better space checking
+                        if y_pos < BOTTOM_MARGIN + 20:
+                            break
                     current_line = word
             
-            if current_line:
-                c.drawString(MARGIN_LEFT, y, current_line)
-                y -= 15
+            if current_line and y_pos >= BOTTOM_MARGIN + 20:
+                c.drawString(MARGIN_LEFT, y_pos, current_line)
+                y_pos -= 15
         
-        y -= 10
+        return y_pos - 15  # Extra space after ICD section
 
-    def draw_footer():
+    def draw_footer(page_num):
         # Pre-format timestamp
         timestamp = datetime.now().strftime("%B %d, %Y at %I:%M %p")
         c.setFont("Helvetica-Oblique", 9)
         c.drawString(MARGIN_LEFT, 30, f"Generated on {timestamp}")
-        c.drawRightString(width - MARGIN_RIGHT, 30, "Page 1")
+        c.drawRightString(width - MARGIN_RIGHT, 30, f"Page {page_num}")
 
-    # Execute all drawing operations
-    draw_title()
-    draw_patient_info()
-    draw_provider_info()
-    draw_services_table()
-    draw_icd_section()
-    draw_footer()
+    # Group rows by service date first to calculate grand total
+    grouped_by_date = defaultdict(list)
+    for row in rows:
+        service_date = row.get('date_of_service', 'Unknown_Date')
+        grouped_by_date[service_date].append(row)
+    
+    # Sort service dates
+    sorted_dates = sorted(grouped_by_date.keys())
+    
+    # Calculate grand total first
+    grand_total = 0.0
+    for service_date in sorted_dates:
+        service_rows = grouped_by_date[service_date]
+        for row in service_rows:
+            try:
+                cost = float(row.get('Charges') or 0)
+            except (ValueError, TypeError):
+                cost = 0.0
+            grand_total += cost
+
+    # Start with first page - Summary page
+    page_num = 1
+    y = height - 60
+    
+    # Draw header sections on first page
+    y = draw_title(y)
+    y = draw_patient_info(y)
+    y = draw_grand_total_summary(y, grand_total, len(sorted_dates))
+    
+    # Draw footer for summary page
+    draw_footer(page_num)
+    
+    # Now create separate pages for each service date
+    for service_date in sorted_dates:
+        service_rows = grouped_by_date[service_date]
+        
+        # Start new page for each service date
+        c.showPage()
+        page_num += 1
+        y = height - 60
+        
+        # Extract provider info specific to this service date
+        provider = extract_provider_data_for_rows(service_rows)
+        
+        # Draw page title for this service date
+        set_font('title')
+        c.drawCentredString(width / 2, y, f"SERVICE DATE: {service_date}")
+        y -= 50
+        
+        # Draw provider info for this service date
+        y = draw_provider_info(y, provider)
+        
+        # Draw services table for this service date
+        y, page_num, subtotal = draw_services_table(y, service_rows, service_date, page_num)
+        
+        # FIXED: Get ICD codes specific to current service date only
+        current_service_icds = service_date_icds.get(service_date, [])
+        print(f"DEBUG: Service date {service_date} has ICD codes: {current_service_icds}")  # Debug print
+        y = draw_icd_section(y, service_date, current_service_icds)
+        
+        # Draw footer for this service date page
+        draw_footer(page_num)
 
     # Single save operation
     c.save()
@@ -599,7 +721,7 @@ def health_check():
 
 @app.route('/patient-pdf')
 def patient_pdf():
-    """Generate and return patient PDF bills as ZIP"""
+    """Generate and return patient PDF bill as single merged document"""
     patient_id = request.args.get('patient_id', '').strip()
     
     if not patient_id:
@@ -613,44 +735,29 @@ def patient_pdf():
     try:
         # Extract service date and ICD codes
         service_date_icds = extract_service_date_icd_codes(rows)
+        print(f"DEBUG: Extracted ICD codes by date: {service_date_icds}")  # Debug print
         
-        # Group rows by date of service
-        grouped = defaultdict(list)
-        for row in rows:
-            date_key = row.get('date_of_service', 'Unknown_Date')
-            grouped[date_key].append(row)
-
-        # Create ZIP file with all PDFs
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-            for date_of_service, group_rows in grouped.items():
-                provider, location = extract_patient_data(group_rows)
-                filtered_icds = {date_of_service: service_date_icds.get(date_of_service, [])}
-                pdf_buffer = generate_pdf(group_rows, provider, location, filtered_icds)
-                
-                # Create safe filename - remove/replace problematic characters
-                safe_date = date_of_service.replace('/', '-').replace(' ', '_').replace(':', '-')
-                safe_patient_id = str(patient_id).replace(' ', '_').replace('/', '-').replace('\\', '-')
-                filename = f"bill_{safe_patient_id}_{safe_date}.pdf"
-                
-                zf.writestr(filename, pdf_buffer.read())
+        # Extract location data
+        location = extract_patient_data(rows)
         
-        zip_buffer.seek(0)
+        # Generate single merged PDF with separate sections for each service date
+        pdf_buffer = generate_merged_pdf(rows, location, service_date_icds)
         
         # Create safe download filename
-        safe_download_name = f"{str(patient_id).replace(' ', '_')}_bills.zip"
+        safe_patient_id = str(patient_id).replace(' ', '_').replace('/', '-').replace('\\', '-')
+        download_name = f"{safe_patient_id}_bill.pdf"
         
-        # Return ZIP file
+        # Return single PDF file
         return send_file(
-            zip_buffer, 
-            mimetype='application/zip', 
+            pdf_buffer, 
+            mimetype='application/pdf', 
             as_attachment=True, 
-            download_name=safe_download_name
+            download_name=download_name
         )
         
     except Exception as e:
         print(f"Error generating PDF: {e}")
-        return f"Error generating bills: {str(e)}", 500
+        return f"Error generating bill: {str(e)}", 500
 
 @app.errorhandler(404)
 def not_found(error):
