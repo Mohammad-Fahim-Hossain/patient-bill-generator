@@ -22,7 +22,7 @@ def get_file_path():
 
 FILE_PATH = get_file_path()
 
-# Enhanced HTML template with modern UI and animations
+# HTML template embedded in Python for Render deployment
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -31,600 +31,195 @@ HTML_TEMPLATE = """
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Patient Bill Generator</title>
   <style>
-    :root {
-      --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      --error-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-      --glass-bg: rgba(255, 255, 255, 0.25);
-      --glass-border: rgba(255, 255, 255, 0.18);
-      --text-primary: #2d3748;
-      --text-secondary: #4a5568;
-      --text-light: #718096;
-      --shadow-soft: 0 20px 40px rgba(0, 0, 0, 0.1);
-      --shadow-hover: 0 30px 60px rgba(0, 0, 0, 0.15);
-      --border-radius: 20px;
-      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
     body {
-      background: var(--primary-gradient);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 40px;
       display: flex;
-      align-items: center;
       justify-content: center;
-      padding: 20px;
-      position: relative;
-      overflow-x: hidden;
-    }
-
-    /* Animated background elements */
-    body::before {
-      content: '';
-      position: fixed;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
-      animation: float 20s ease-in-out infinite;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-20px) rotate(180deg); }
-    }
-
-    .floating-shapes {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .shape {
-      position: absolute;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.1);
-      animation: floatingShapes 15s ease-in-out infinite;
-    }
-
-    .shape:nth-child(1) {
-      width: 80px;
-      height: 80px;
-      top: 10%;
-      left: 10%;
-      animation-delay: -2s;
-    }
-
-    .shape:nth-child(2) {
-      width: 120px;
-      height: 120px;
-      top: 20%;
-      right: 15%;
-      animation-delay: -4s;
-    }
-
-    .shape:nth-child(3) {
-      width: 60px;
-      height: 60px;
-      bottom: 20%;
-      left: 20%;
-      animation-delay: -6s;
-    }
-
-    .shape:nth-child(4) {
-      width: 100px;
-      height: 100px;
-      bottom: 15%;
-      right: 20%;
-      animation-delay: -8s;
-    }
-
-    @keyframes floatingShapes {
-      0%, 100% {
-        transform: translateY(0px) translateX(0px) scale(1);
-        opacity: 0.7;
-      }
-      25% {
-        transform: translateY(-30px) translateX(20px) scale(1.1);
-        opacity: 0.4;
-      }
-      50% {
-        transform: translateY(-20px) translateX(-15px) scale(0.9);
-        opacity: 0.8;
-      }
-      75% {
-        transform: translateY(10px) translateX(25px) scale(1.05);
-        opacity: 0.5;
-      }
+      min-height: 100vh;
+      margin: 0;
     }
 
     .container {
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      padding: 40px;
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow-soft);
-      width: 100%;
-      max-width: 480px;
-      z-index: 10;
-      position: relative;
-      transition: var(--transition);
-      animation: containerSlideIn 0.8s ease-out;
-    }
-
-    .container:hover {
-      transform: translateY(-5px);
-      box-shadow: var(--shadow-hover);
-    }
-
-    @keyframes containerSlideIn {
-      0% {
-        opacity: 0;
-        transform: translateY(30px) scale(0.95);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 35px;
-    }
-
-    .header h1 {
-      color: white;
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 8px;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-      animation: titleGlow 2s ease-in-out infinite alternate;
-    }
-
-    @keyframes titleGlow {
-      0% { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
-      100% { text-shadow: 0 2px 20px rgba(255, 255, 255, 0.3); }
-    }
-
-    .subtitle {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 16px;
-      font-weight: 400;
-      opacity: 0;
-      animation: fadeInUp 0.8s ease-out 0.3s forwards;
-    }
-
-    @keyframes fadeInUp {
-      0% {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .health-status {
-      text-align: center;
-      margin-bottom: 25px;
-      padding: 12px;
+      background: #fff;
+      padding: 30px 40px;
       border-radius: 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      transition: var(--transition);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 500px;
+      z-index: 1;
+      margin: auto;
     }
 
-    .health-status span {
-      font-size: 14px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .form-group {
-      margin-bottom: 25px;
-      opacity: 0;
-      animation: fadeInUp 0.8s ease-out 0.5s forwards;
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 28px;
     }
 
     label {
       display: block;
-      margin-bottom: 8px;
-      color: white;
+      margin-top: 15px;
+      color: #333;
       font-weight: 600;
-      font-size: 15px;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    }
-
-    .input-container {
-      position: relative;
+      font-size: 16px;
     }
 
     input[type="text"] {
       width: 100%;
-      padding: 16px 20px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 15px;
-      font-size: 16px;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      backdrop-filter: blur(10px);
-      transition: var(--transition);
-      outline: none;
-    }
-
-    input[type="text"]::placeholder {
-      color: rgba(255, 255, 255, 0.6);
+      padding: 15px;
+      margin-top: 10px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 18px;
+      background: #fdfdfd;
+      transition: border-color 0.3s ease;
+      box-sizing: border-box;
     }
 
     input[type="text"]:focus {
-      border-color: rgba(255, 255, 255, 0.6);
-      background: rgba(255, 255, 255, 0.15);
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-      transform: scale(1.02);
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
     }
 
-    .input-icon {
-      position: absolute;
-      right: 15px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: rgba(255, 255, 255, 0.6);
-      transition: var(--transition);
-    }
-
-    input[type="text"]:focus + .input-icon {
-      color: rgba(255, 255, 255, 0.9);
-      transform: translateY(-50%) scale(1.2);
-    }
-
-    .submit-btn {
+    button {
+      margin-top: 30px;
       width: 100%;
-      padding: 18px;
-      background: var(--secondary-gradient);
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border: none;
       color: white;
       font-size: 18px;
-      font-weight: 700;
-      border-radius: 15px;
+      font-weight: bold;
+      border-radius: 8px;
       cursor: pointer;
-      transition: var(--transition);
-      position: relative;
-      overflow: hidden;
-      opacity: 0;
-      animation: fadeInUp 0.8s ease-out 0.7s forwards;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .submit-btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-      transition: left 0.6s;
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
     }
 
-    .submit-btn:hover::before {
-      left: 100%;
+    button:active {
+      transform: translateY(0);
     }
 
-    .submit-btn:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 15px 30px rgba(245, 87, 108, 0.4);
-    }
-
-    .submit-btn:active {
-      transform: translateY(-1px);
-    }
-
-    .submit-btn:disabled {
-      opacity: 0.7;
+    button:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
       transform: none;
     }
 
-    .submit-btn.generating {
-      background: var(--success-gradient);
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-
-    /* Enhanced loading spinner */
-    .spinner-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(10px);
-      z-index: 9999;
-      justify-content: center;
-      align-items: center;
-      animation: fadeIn 0.3s ease-out;
-    }
-
-    @keyframes fadeIn {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
-    .spinner-container {
+    .footer {
       text-align: center;
-      color: white;
-    }
-
-    .spinner {
-      width: 80px;
-      height: 80px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top: 4px solid #ffffff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .loading-text {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 10px;
-      animation: loadingPulse 1.5s ease-in-out infinite;
-    }
-
-    .loading-subtext {
+      margin-top: 25px;
       font-size: 14px;
-      color: rgba(255, 255, 255, 0.8);
+      color: #777;
     }
 
-    @keyframes loadingPulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
-    }
-
-    /* Enhanced status messages */
-    .status {
-      margin-top: 20px;
-      padding: 16px 20px;
-      border-radius: 12px;
-      display: none;
-      font-weight: 600;
+    .description {
       text-align: center;
-      animation: statusSlideIn 0.5s ease-out;
-      backdrop-filter: blur(10px);
+      color: #666;
+      margin-bottom: 20px;
+      font-size: 14px;
     }
 
-    @keyframes statusSlideIn {
-      0% {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
     }
 
     .status.success {
-      background: rgba(76, 175, 80, 0.2);
-      color: #e8f5e8;
-      border: 2px solid rgba(76, 175, 80, 0.3);
-      box-shadow: 0 4px 20px rgba(76, 175, 80, 0.2);
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
     }
 
     .status.error {
-      background: rgba(244, 67, 54, 0.2);
-      color: #ffebee;
-      border: 2px solid rgba(244, 67, 54, 0.3);
-      box-shadow: 0 4px 20px rgba(244, 67, 54, 0.2);
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
     }
 
-    .footer {
-      text-align: center;
-      margin-top: 30px;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.7);
-      opacity: 0;
-      animation: fadeInUp 0.8s ease-out 1s forwards;
-    }
-
-    .footer a {
-      color: rgba(255, 255, 255, 0.9);
-      text-decoration: none;
-      transition: var(--transition);
-    }
-
-    .footer a:hover {
-      color: white;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    }
-
-    /* Progress indicator */
-    .progress-steps {
+    .spinner-overlay {
       display: none;
-      margin-top: 15px;
-    }
-
-    .progress-steps.active {
-      display: block;
-      animation: fadeInUp 0.5s ease-out;
-    }
-
-    .step {
-      display: flex;
+      position: fixed;
+      top: 0; 
+      left: 0;
+      width: 100%; 
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 999;
+      justify-content: center;
       align-items: center;
-      margin-bottom: 8px;
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.8);
     }
 
-    .step-icon {
-      width: 16px;
-      height: 16px;
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #667eea;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.3);
-      margin-right: 10px;
-      transition: var(--transition);
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
     }
 
-    .step.completed .step-icon {
-      background: #4CAF50;
-      animation: checkmark 0.5s ease-out;
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
-    .step.active .step-icon {
-      background: #2196F3;
-      animation: pulse 1s ease-in-out infinite;
+    .health-status {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: #888;
     }
 
-    @keyframes checkmark {
-      0% { transform: scale(0.5); }
-      100% { transform: scale(1); }
-    }
-
-    /* Responsive design */
-    @media (max-width: 768px) {
-      .container {
-        padding: 30px 25px;
-        margin: 15px;
-      }
-      
-      .header h1 {
-        font-size: 28px;
-      }
-      
-      .subtitle {
-        font-size: 14px;
-      }
-
-      .submit-btn {
-        padding: 16px;
-        font-size: 16px;
-      }
-    }
-
-    @media (max-width: 480px) {
+    @media (max-width: 600px) {
       body {
-        padding: 10px;
+        padding: 20px;
       }
       
       .container {
-        padding: 25px 20px;
+        padding: 20px;
       }
       
-      .header h1 {
+      h1 {
         font-size: 24px;
-      }
-    }
-
-    /* Dark mode enhancements */
-    @media (prefers-color-scheme: dark) {
-      .container {
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-      
-      input[type="text"] {
-        background: rgba(0, 0, 0, 0.2);
-        border-color: rgba(255, 255, 255, 0.1);
       }
     }
   </style>
 </head>
 <body>
-  <!-- Animated background shapes -->
-  <div class="floating-shapes">
-    <div class="shape"></div>
-    <div class="shape"></div>
-    <div class="shape"></div>
-    <div class="shape"></div>
-  </div>
-
-  <!-- Enhanced loading spinner -->
   <div class="spinner-overlay" id="loadingSpinner">
-    <div class="spinner-container">
-      <div class="spinner"></div>
-      <div class="loading-text">Generating Your Bill</div>
-      <div class="loading-subtext">Please wait while we process your request...</div>
-      <div class="progress-steps" id="progressSteps">
-        <div class="step" id="step1">
-          <div class="step-icon"></div>
-          <span>Searching patient records...</span>
-        </div>
-        <div class="step" id="step2">
-          <div class="step-icon"></div>
-          <span>Calculating charges...</span>
-        </div>
-        <div class="step" id="step3">
-          <div class="step-icon"></div>
-          <span>Generating PDF document...</span>
-        </div>
-        <div class="step" id="step4">
-          <div class="step-icon"></div>
-          <span>Preparing download...</span>
-        </div>
-      </div>
-    </div>
+    <div class="spinner"></div>
   </div>
 
   <div class="container">
-    <div class="header">
-      <h1>Patient Bill Generator</h1>
-      <div class="subtitle">Generate and download professional billing statements</div>
-    </div>
-
+    <h1>Generate Patient Bills</h1>
     <div class="health-status">
-      <span id="healthStatus">🔄 Checking system status...</span>
+      <span id="healthStatus">Checking system status...</span>
+    </div>
+    <div class="description">
+      Enter the Patient ID to generate and download billing statements
     </div>
 
     <form id="billForm">
-      <div class="form-group">
-        <label for="patient_id">Patient ID</label>
-        <div class="input-container">
-          <input type="text" id="patient_id" name="patient_id" required 
-                 placeholder="Enter Patient ID (e.g., P001, 12345)">
-          <div class="input-icon">👤</div>
-        </div>
-      </div>
-
-      <button type="submit" class="submit-btn" id="submitBtn">
-        <span>Generate & Download Bill</span>
-      </button>
+      <label for="patient_id">Patient ID:</label>
+      <input type="text" id="patient_id" name="patient_id" required placeholder="Enter Patient ID">
+      <button type="submit" id="submitBtn">Generate & Download Bill</button>
     </form>
 
     <div class="status" id="statusDiv"></div>
 
     <div class="footer">
-      <strong>&copy; 2024 MYNX SOFTWARES INC</strong><br>
-      Deployed with ❤️ on <a href="#" target="_blank">Render</a>
+      &copy; MYNX SOFTWARES INC | Deployed on Render
     </div>
   </div>
 
@@ -634,90 +229,42 @@ HTML_TEMPLATE = """
     const statusDiv = document.getElementById('statusDiv');
     const submitBtn = document.getElementById('submitBtn');
     const healthStatus = document.getElementById('healthStatus');
-    const progressSteps = document.getElementById('progressSteps');
 
-    // Enhanced health status check
-    function checkHealthStatus() {
+    // Check health status on load
+    window.addEventListener('load', function() {
       fetch('/health')
         .then(response => response.json())
         .then(data => {
-          const isHealthy = data.status === 'healthy';
-          healthStatus.innerHTML = isHealthy 
-            ? '✅ System operational & ready' 
-            : '⚠️ System issues detected';
-          healthStatus.style.color = isHealthy ? '#4CAF50' : '#f44336';
-          
-          // Add subtle animation
-          healthStatus.style.transform = 'scale(1.05)';
-          setTimeout(() => {
-            healthStatus.style.transform = 'scale(1)';
-          }, 200);
+          healthStatus.textContent = data.status === 'healthy' ? 'System operational ✓' : 'System issues detected';
+          healthStatus.style.color = data.status === 'healthy' ? '#28a745' : '#dc3545';
         })
         .catch(() => {
-          healthStatus.innerHTML = '❌ Unable to check system status';
-          healthStatus.style.color = '#f44336';
+          healthStatus.textContent = 'Unable to check system status';
+          healthStatus.style.color = '#dc3545';
         });
-    }
+    });
 
-    // Progress step animation
-    function animateProgress() {
-      const steps = ['step1', 'step2', 'step3', 'step4'];
-      const timings = [500, 1500, 3000, 4000]; // Staggered timings
-      
-      progressSteps.classList.add('active');
-      
-      steps.forEach((stepId, index) => {
-        setTimeout(() => {
-          const step = document.getElementById(stepId);
-          step.classList.add('active');
-          
-          // Complete previous steps
-          if (index > 0) {
-            document.getElementById(steps[index - 1]).classList.remove('active');
-            document.getElementById(steps[index - 1]).classList.add('completed');
-          }
-        }, timings[index]);
-      });
-    }
-
-    // Enhanced status display
     function showStatus(message, type) {
-      statusDiv.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-          <span style="font-size: 20px;">${type === 'success' ? '✅' : '❌'}</span>
-          <span>${message}</span>
-        </div>
-      `;
+      statusDiv.textContent = message;
       statusDiv.className = `status ${type}`;
       statusDiv.style.display = 'block';
-      
-      // Auto-hide after 6 seconds
       setTimeout(() => {
-        statusDiv.style.opacity = '0';
-        setTimeout(() => {
-          statusDiv.style.display = 'none';
-          statusDiv.style.opacity = '1';
-        }, 300);
-      }, 6000);
+        statusDiv.style.display = 'none';
+      }, 5000);
     }
 
-    // Enhanced form submission
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
-      // Visual feedback
       spinner.style.display = 'flex';
       submitBtn.disabled = true;
-      submitBtn.classList.add('generating');
-      submitBtn.innerHTML = '<span>🔄 Generating...</span>';
-      
-      // Start progress animation
-      animateProgress();
+      submitBtn.textContent = 'Generating...';
 
       const patientId = document.getElementById('patient_id').value.trim();
       if (!patientId) {
-        showStatus("Please enter a valid Patient ID", "error");
-        resetForm();
+        showStatus("Please enter a Patient ID", "error");
+        spinner.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Generate & Download Bill';
         return;
       }
 
@@ -729,90 +276,30 @@ HTML_TEMPLATE = """
           throw new Error(errorText || `Server responded with status ${response.status}`);
         }
 
-        // Complete all progress steps
-        setTimeout(() => {
-          document.getElementById('step4').classList.add('completed');
-          document.getElementById('step4').classList.remove('active');
-        }, 4500);
-
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `${patientId}_bill.pdf`;
-        
-        // Enhanced download experience
         document.body.appendChild(link);
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
         
-        showStatus(`🎉 Bill for Patient ${patientId} generated successfully!`, "success");
-        
-        // Reset form after successful download
-        setTimeout(() => {
-          document.getElementById('patient_id').value = '';
-        }, 2000);
-        
+        showStatus("Bill generated and downloaded successfully!", "success");
       } catch (error) {
         console.error('Download error:', error);
-        showStatus(`Failed to generate bill: ${error.message}`, "error");
+        showStatus("Error: " + error.message, "error");
       } finally {
-        resetForm();
-      }
-    });
-
-    function resetForm() {
-      spinner.style.display = 'none';
-      submitBtn.disabled = false;
-      submitBtn.classList.remove('generating');
-      submitBtn.innerHTML = '<span>Generate & Download Bill</span>';
-      progressSteps.classList.remove('active');
-      
-      // Reset progress steps
-      ['step1', 'step2', 'step3', 'step4'].forEach(stepId => {
-        const step = document.getElementById(stepId);
-        step.classList.remove('active', 'completed');
-      });
-    }
-
-    // Initialize
-    window.addEventListener('load', function() {
-      checkHealthStatus();
-      
-      // Auto-refresh health status every 30 seconds
-      setInterval(checkHealthStatus, 30000);
-      
-      // Add subtle hover effects to input
-      const input = document.getElementById('patient_id');
-      input.addEventListener('focus', function() {
-        this.parentElement.style.transform = 'translateY(-2px)';
-      });
-      
-      input.addEventListener('blur', function() {
-        this.parentElement.style.transform = 'translateY(0)';
-      });
-    });
-
-    // Add keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-      // Ctrl/Cmd + Enter to submit
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        form.dispatchEvent(new Event('submit'));
-      }
-      
-      // Escape to clear input
-      if (e.key === 'Escape') {
-        document.getElementById('patient_id').value = '';
-        document.getElementById('patient_id').focus();
+        spinner.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Generate & Download Bill';
       }
     });
   </script>
 </body>
 </html>
 """
-
-# [Rest of the Python code remains the same - search_rows, extract functions, PDF generation, routes, etc.]
 
 def search_rows(patient_id):
     """Search for patient rows in the data file"""
@@ -1288,7 +775,7 @@ if __name__ == "__main__":
     debug = os.environ.get('FLASK_ENV', 'production') == 'development'
     
     # Print startup info
-    print(f"Starting Enhanced Patient Bill Generator...")
+    print(f"Starting Patient Bill Generator...")
     print(f"Data file path: {FILE_PATH}")
     print(f"File exists: {os.path.exists(FILE_PATH)}")
     print(f"Running on port: {port}")
